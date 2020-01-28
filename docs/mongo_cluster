@@ -1,5 +1,7 @@
+#++++++++++++++++++++++++++++++++++++++++++++
 #- Useful instruction for mongo shard cluster
-#- source - 
+#++++++++++++++++++++++++++++++++++++++++++++
+#- most from source - https://www.javacodegeeks.com/2015/02/setting-up-sharded-mongodb-cluster-in-localhost.html 
 Mongodb cluster creation
 
 $ mkdir \data\configdb
@@ -40,3 +42,5 @@ In the sh.shardCollection we specify the collection and the field from the col
 # Check the status
 $ mongo --port 27011 --host localhost
 mongos > sh.status()
+
++=================================================================================
