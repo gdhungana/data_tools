@@ -1,0 +1,42 @@
+#- Useful instruction for mongo shard cluster
+#- source - 
+Mongodb cluster creation
+
+$ mkdir \data\configdb
+$ mongod --configsvr --port 27010
+
+#- setup query router
+$ mongos -configdb localhost:27010 --port 27011   #- router/master
+
+
+It is recommended to run with 3 configdb server for production so as to avoid a single point of failure. But for our testing, 1 configdb server should be fine.
+--configdb command line option is used to let the Query router know about the config servers we have setup. It takes a comma separated: values like –configdb host1:port1,host2:port2. In our case we have only 1 config server.
+
+#- running mongodb s
+Mongodb Shard – 1
+1	$ mongod --port 27012 --dbpath \data\db
+Mongodb Shard – 2
+1	$ mongod --port 27013 --dbpath \data\db2
+#Mongodb Shard – 3
+#1	$ mongod --port 27014 --dbpath \data\db3
+
+Registering the shards with mongos (Running in master)
+
+$ mongo --port 27011 --host localhost 
+mongos> sh.addShard("localhost:27012")
+{ "shardAdded" : "shard0000", "ok" : 1 }
+mongos> sh.addShard("localhost:27013")
+{ "shardAdded" : "shard0001", "ok" : 1 }
+mongos> sh.enableSharding("students")
+{ "ok" : 1 }
+mongos> sh.shardCollection("students.grades", {"student_id" : 1})
+{ "collectionsharded" : "students.grades", "ok" : 1 }
+mongos>
+
+In the sh.shardCollection we specify the collection and the field from the collection which is to be used as a shard key.
+
+#- Insert some data
+
+# Check the status
+$ mongo --port 27011 --host localhost
+mongos > sh.status()
