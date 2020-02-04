@@ -42,5 +42,86 @@ In the sh.shardCollection we specify the collection and the field from the col
 # Check the status
 $ mongo --port 27011 --host localhost
 mongos > sh.status()
-
 +=================================================================================
+
+#- updated 
+1. shard servers with replicas
+	
+mongod --shardsvr --replSet "rs0" --bind_ip localhost --port 27012 --dbpath /Users/gd397w/mongo_data/shard1db
+mongod --shardsvr --replSet "rs0" --bind_ip localhost --port 27013 --dbpath /Users/gd397w/mongo_data/shard2db
+	
+2. initiate the shardsvr only 1 server!!!
+mongo --port 27012 --host localhost
+rs.initiate( {	  
+           _id : "rs0",
+	   members: [
+	      { _id: 0, host: "localhost:27012" },
+	      { _id: 1, host: "localhost:27013" },
+	   ]
+	})
+	#rs.stepDown()
+	
+3. same for another shard replica	
+mongod --shardsvr --replSet "rs1" --port 27014 --bind_ip localhost --dbpath /Users/gd397w/mongo_data/shard3db
+mongod --shardsvr --replSet "rs1" --port 27015 --bind_ip localhost --dbpath /Users/gd397w/mongo_data/shard4db
+	
+	mongo --port 27014 --host localhost
+	rs.initiate( {
+	   _id : "rs1",
+	   members: [
+	      { _id: 0, host: "localhost:27014" },
+	      { _id: 1, host: "localhost:27015" }
+	   ]
+	})
+	
+
+Start Config server
+mongod --configsvr --port 27010 --dbpath /Users/gd397w/mongo_data/configdb --replSet configreplset
+
+mongo --port 27010 --host localhost
+rs.initiate( {
+   _id: "configreplset",
+   configsvr: true,
+   members: [
+      { _id: 0, host: "localhost:27010" },
+  ]
+})
+
+
+Start mongos
+mongos -configdb configreplset/localhost:27010 --port 27011
+
+
+mongo --port 27011 --host localhost
+Opens mongos
+
+sh.addShard( "rs0/localhost:27012,localhost:27013")
+sh.addShard( "rs1/localhost:27014,localhost:27015")
+sh.status()
+
+
+Now get the db instance
+sh.enableSharding("students")
+
+use students
+db.grds.createIndex( { number: 1 } )
+ 
+use students
+sh.shardCollection( "students.grds", { "number" : 1 } )
+
+use students
+var bulk = db.grds.initializeUnorderedBulkOp();
+people = ["Marc", "Bill", "George", "Eliot", "Matt", "Trey", "Tracy", "Greg", "Steve", "Kristina", "Katie", "Jeff"];
+for(var i=0; i<1000000; i++){
+   user_id = i;
+   name = people[Math.floor(Math.random()*people.length)];
+   number = Math.floor(Math.random()*10001);
+   bulk.insert( { "user_id":user_id, "name":name, "number":number });
+}
+bulk.execute();
+
+use students
+sh.status()
+db.stats()
+db.printShardingStatus()
+
