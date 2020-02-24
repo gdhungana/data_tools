@@ -70,4 +70,30 @@ def add_row_num(df,ratio=None):
 
     return df_out
 
+def mergeDFs(df1,df2,ratio=None):
+    """
+    merge two pyspark databases
+    """
+    #- first check for the common columns
+    comcols = list(set(df1.columns) & set(df2.columns))
+    if len(comcols) > 0:
+        combDF=df1.join(df2,tt,"outer")
+ 
+    else: #- no common columns
+        df1_row = add_row_num(df1,ratio = ratio)
+        df2_row = add_row_num(df2,ratio = ratio)
+        combDF = df1_row.join(df2_row, on = 'row_num').drop('row_num')
+    return combDF
 
+def extract_key(key,listofdicts):
+    newlist=[]
+    for ii in range(len(listofdicts)):
+        for k,v in listofdicts[ii].items():
+            if k == key:
+                newlist.append(v)
+            else:
+                newlist.append(None)
+    return newlist 
+
+
+ 
