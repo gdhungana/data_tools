@@ -96,4 +96,51 @@ def extract_key(key,listofdicts):
     return newlist 
 
 
- 
+#- create partitioned hive table (agnostic)
+def createDtPartitionTable(hiveContext,path,from_table,to_table,dt,bucketing=False,bucketing_key='',bucketing_size=64,external='external'):
+    test_rows=hiveContext.sql("select * from "+from_table+" limit 1").collect()
+    #assert (len(test_rows) > 0),"ERROR: no records in "+from_table +' for to_table: '+to_table+ ' dt=' +dt; 
+    if (len(test_rows) < 0): print("+++ERROR: no records in "+from_table +' for to_table: '+to_table+ ' dt=' +dt); 
+    print("from_table is:  "+from_table)
+    #hiveContext.sql('DROP TABLE if exists '+table);
+    new_rows=hiveContext.sql("desc "+from_table).collect()
+
+    new_schema = ','.join(['`'+row.col_name+ '` '+row.data_type for row in new_rows if (row[0]!='dt' and 'Partition' not in row[0] and 'col_name' not in row[0]) ])
+    new_col_names = ','.join(['`'+row.col_name+ '`' for row in new_rows if (row[0]!='dt' and 'Partition' not in row[0] and 'col_name' not in row[0])])
+
+    table_exists = False
+    tables=hiveContext.sql("show tables").collect()
+    for row in tables:
+        if to_table==row[0]:
+            table_exists = True
+            break
+
+    if table_exists:
+        existing_schema=''
+        existing_rows=hiveContext.sql("desc "+to_table).collect()
+        existing_col_names = ','.join([row.col_name for row in existing_rows if (row[0]!='dt' and 'Partition' not in row[0] and 'col_name' not in row[0]) ])
+        ###### see if existsing table has the same schema if not drop and recreate 
+        old_name=existing_col_names.lower().replace('`','')
+        new_name=new_col_names.lower().replace('`','')
+        assert (old_name == new_name),"ERROR: schema changed!! to_table:" + to_table+ "; old: "+old_name+'; new: '+new_name
+
+    if path =='':
+        location_clause=''
+    else:
+        location_clause="LOCATION '"+path +"'"
+    print("create "+ external+" table IF NOT EXISTS "+to_table+ " ("+new_schema+") " \
+        +"PARTITIONED BY (dt int) " \
+        +"ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.OpenCSVSerde' "\
+        +location_clause)
+    hiveContext.sql("create "+ external+" table IF NOT EXISTS "+to_table+ " ("+new_schema+") " \
+        +"PARTITIONED BY (dt int) " \
+        +"ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.OpenCSVSerde' "\
+        +location_clause) 
+    #new_col_names+= ','+str(dt)
+    if bucketing: 
+        hiveContext.sql("SET hive.enforce.bucketing=true")
+        hiveContext.sql( "ALTER TABLE "+ to_table+ " CLUSTERED BY ("+bucketing_key+") into "+str(bucketing_size)+" BUCKETS ")
+    #- load data
+    s="insert overwrite table "+to_table+" partition (dt="+str(dt)+") select "+new_col_names + " from "+from_table
+    print(s)
+    hiveContext.sql(s)   
