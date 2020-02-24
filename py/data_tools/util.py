@@ -47,5 +47,27 @@ def json_loads(listofstrings):
     return flat_val
 
 
+def dictstoDF(sparksession,listofdicts):
+    sc = sparksession.sparkContext
+    sqlContext = SQLContext(sc)
+    parRdd = sc.parallelize(listofdicts)
+    thisdFrame = sqlContext.read.json(parRdd)
+    return thisdFrame
+
+def flatten_row(r):
+    r_ = r.features.asDict()
+    r_.update({'row_num': r.row_num})
+    return Row(**r_)
+
+def add_row_num(df,ratio=None):
+    
+    if ratio is not None:
+        df_row_num = df.rdd.zipWithIndex().toDF(['features', 'row_num'],sampleRatio=ratio)
+        df_out = df_row_num.rdd.map(lambda x : flatten_row(x)).toDF(sampleRatio=ratio)
+    else: #- default 100 rows to infer schema
+        df_row_num = df.rdd.zipWithIndex().toDF(['features', 'row_num'])
+        df_out = df_row_num.rdd.map(lambda x : flatten_row(x)).toDF()
+
+    return df_out
 
 
